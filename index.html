@@ -1,1 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SearchGames - База игр</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #121212; color: #ffffff; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #333; }
+        h1 { color: #4ade80; }
+        .btn { background-color: #4ade80; color: #000; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background-color: #22c55e; }
+        .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .game-card { background-color: #1e1e1e; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .game-card:hover { transform: translateY(-5px); }
+        .game-image { width: 100%; height: 150px; object-fit: cover; background-color: #333; }
+        .game-info { padding: 15px; }
+        .game-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+        .game-genre { color: #aaa; font-size: 14px; margin-bottom: 10px; }
+        .game-rating { color: #fbbf24; font-weight: bold; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
+        .modal-content { background: #1e1e1e; padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; }
+        .modal-content input { width: 100%; padding: 10px; margin-bottom: 15px; background: #333; border: 1px solid #444; color: white; border-radius: 8px; }
+        .modal-content input:focus { outline: none; border-color: #4ade80; }
+    </style>
+</head>
+<body>
 
+    <header>
+        <h1>🎮 SearchGames</h1>
+        <button class="btn" onclick="openModal()">+ Добавить игру</button>
+    </header>
+
+    <div class="games-grid" id="games-container">
+        <!-- Сюда будут загружаться игры -->
+    </div>
+
+    <!-- Модальное окно для добавления -->
+    <div class="modal" id="add-modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">Добавить игру</h2>
+            <input type="text" id="game-title" placeholder="Название игры">
+            <input type="text" id="game-genre" placeholder="Жанр (Экшен, RPG...)">
+            <input type="text" id="game-image" placeholder="Ссылка на картинку (URL)">
+            <button class="btn" onclick="addGame()" style="width: 100%;">Сохранить</button>
+            <button onclick="closeModal()" style="width: 100%; background: transparent; border: none; color: #aaa; margin-top: 10px; cursor: pointer;">Отмена</button>
+        </div>
+    </div>
+
+    <script>
+        // ВСТАВЬ СВОИ КЛЮЧИ СЮДА
+        const SUPABASE_URL = 'https://zngssohaxspmphdskxow.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_eaCY_hG_Zxrr5piBRIZcZg_hyyFL_c-';
+
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Загрузка игр
+        async function loadGames() {
+            const container = document.getElementById('games-container');
+            container.innerHTML = '<p>Загрузка...</p>';
+
+            const { data: games, error } = await _supabase.from('games').select('*').order('id', { ascending: false });
+
+            if (error) {
+                console.error('Ошибка:', error);
+                container.innerHTML = '<p>Ошибка загрузки игр</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            if (games.length === 0) {
+                container.innerHTML = '<p style="color: #aaa;">Пока нет игр. Добавь первую!</p>';
+                return;
+            }
+
+            games.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.innerHTML = `
+                    <img src="${game.image_url || 'https://via.placeholder.com/250x150?text=No+Image'}" class="game-image" alt="${game.title}">
+                    <div class="game-info">
+                        <div class="game-title">${game.title}</div>
+                        <div class="game-genre">${game.genre || 'Жанр не указан'}</div>
+                        <div class="game-rating">★ ${game.rating || 0}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Добавление игры
+        async function addGame() {
+            const title = document.getElementById('game-title').value;
+            const genre = document.getElementById('game-genre').value;
+            const image = document.getElementById('game-image').value;
+
+            if (!title) { alert('Введи название игры!'); return; }
+
+            const { error } = await _supabase.from('games').insert([
+                { title: title, genre: genre, image_url: image, rating: 0 }
+            ]);
+
+            if (error) {
+                alert('Ошибка при добавлении: ' + error.message);
+            } else {
+                closeModal();
+                document.getElementById('game-title').value = '';
+                document.getElementById('game-genre').value = '';
+                document.getElementById('game-image').value = '';
+                loadGames();
+            }
+        }
+
+        // Управление окном
+        function openModal() { document.getElementById('add-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('add-modal').style.display = 'none'; }
+
+        // Загрузка при старте
+        loadGames();
+    </script>
+</body>
+</html>
